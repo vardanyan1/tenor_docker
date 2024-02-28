@@ -29,45 +29,35 @@ class Config:
     DEBUG = os.getenv("DEBUG", "False").lower() == "true"
     NUFNU_LIMIT = 1e-19  # or any other value you need
 
-    # Set API_BASE_URL based on DEBUG mode
-    if DEBUG:
-        API_BASE_URL = "http://backend:8000/api/tenor/"
-    else:
-        API_BASE_URL = "https://mmdc.am/api/tenor/"
 
 class DataHandler:
     def __init__(self, uuid):
         self.uuid = uuid
-        self.api_url = Config.API_BASE_URL + f"{uuid}/"
+        # Assuming the CSV file is named "data.csv" and is located in the same folder as this script.
+        self.file_path = "data.csv"
 
     def read_data(self):
-        try:
-            response = requests.get(self.api_url)
-            response.raise_for_status()
+        # Hardcoded values for ebl_value and z_value for testing
+        ebl_value = 1.0  # Example EBL value, adjust as needed
+        z_value = 0.5  # Example redshift value, adjust as needed
 
-            data = response.json()
-            # Process data
-            if 'file_url' in data:
-                filename = self.download_file(data['file_url'])
-                self.process_data(filename)
-                self.rename_csv_columns(filename, ['x', 'y', 'dy'])
+        # Process the CSV file
+        try:
+            # Read data from the local CSV file
+            filename = self.file_path
+            self.process_data(filename)
+            self.rename_csv_columns(filename, ['x', 'y', 'dy'])
 
             return {
-                'ebl_value': data['ebl_value'],
-                'z_value': data['z_value'],
-                'data': filename if 'file_url' in data else None
+                'ebl_value': ebl_value,
+                'z_value': z_value,
+                'data': filename
             }
 
-        except requests.exceptions.HTTPError as http_err:
-            raise ValueError(f"HTTP error occurred: {http_err} - UUID: {self.uuid}")
-        except requests.exceptions.RequestException as req_err:
-            raise ValueError(f"Request error occurred: {req_err} - UUID: {self.uuid}")
-        except json.JSONDecodeError as json_err:
-            raise ValueError(f"JSON decode error: {json_err} - Response was: '{response.text}' - UUID: {self.uuid}")
         except Exception as e:
             tb_str = traceback.format_exc()
             error_message = (
-                f"An unexpected error occurreddd: {e.__class__.__name__}: {e.args} - UUID: {self.uuid}\n"
+                f"An error occurred while reading data from CSV: {e.__class__.__name__}: {e.args} - UUID: {self.uuid}\n"
                 f"Traceback:\n{tb_str}"
             )
             raise ValueError(error_message)
@@ -91,25 +81,6 @@ class DataHandler:
             writer.writeheader()
             writer.writerows(data)
 
-    def post_results(self, results):
-        try:
-            response = requests.post(self.api_url, json=results)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.HTTPError as http_err:
-            raise ValueError(f"HTTP error occurred: {http_err} - UUID: {self.uuid}")
-        except requests.exceptions.RequestException as req_err:
-            raise ValueError(f"Request error occurred: {req_err} - UUID: {self.uuid}")
-        except json.JSONDecodeError as json_err:
-            raise ValueError(f"JSON decode error: {json_err} - Response was: '{response.text}' - UUID: {self.uuid}")
-        except Exception as e:
-            tb_str = traceback.format_exc()
-            error_message = (
-                f"An unexpected error occurreddd: {e.__class__.__name__}: {e.args} - UUID: {self.uuid}\n"
-                f"Traceback:\n{tb_str}"
-            )
-            raise ValueError(error_message)
-
     def rename_csv_columns(self, filename, new_columns):
         with open(filename, 'r') as file:
             reader = csv.reader(file)
@@ -121,17 +92,6 @@ class DataHandler:
         with open(filename, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(data)
-
-    def download_file(self, file_url):
-        response = requests.get(file_url)
-        if response.status_code == 200:
-            filename = f"{self.uuid}.csv"
-            with open(filename, 'wb') as file:
-                file.write(response.content)
-
-            return filename
-        else:
-            raise ValueError("Failed to download the file")
 
 
 class ModelInitializer:
@@ -242,9 +202,9 @@ class MultinestModeling:
 
     def run(self):
         try:
-            logging.info(f"Starting Multinest modeling for UUID: {self.uuid}")
+            logging.info(f"Starting Multinest modeling...")
             # Create an instance of DataHandler
-            data_handler = DataHandler(self.uuid)
+            data_handler = DataHandler(uuid=self.uuid)
 
             batch_data = data_handler.read_data()
             # Load data from CSV file
@@ -264,35 +224,9 @@ class MultinestModeling:
             results = result_handler.process_results()
             logging.info("Result handling completed successfully")
 
-            # Post the results to the server
-            post_response = data_handler.post_results(results)
-            logging.info(f"Results posted successfully: {post_response}")
-
-            return True
-
-        except Exception as e:
-            logging.error(f"Error during modeling: {e}")
-            return False
-
-    def debug_run(self):
-        try:
-            logging.info(f"Starting DEBUG RUN")
-
-            data_handler = DataHandler(self.uuid)
-
-            batch_data = data_handler.read_data()
-
-            # Read results from response.json
-            inference_path = os.getenv("INFERENCE_PATH")
-            with open(os.path.join(inference_path, "response.json"), "r") as file:
-                results = json.load(file)
-            time.sleep(20)
-            logging.info("Result handling completed successfully")
-
-            # Post the results to the server
-            data_handler = DataHandler(self.uuid)
-            post_response = data_handler.post_results(results)
-            logging.info(f"Results posted successfully: {post_response}")
+            # # Post the results to the server
+            # post_response = data_handler.post_results(results)
+            # logging.info(f"Results posted successfully: {post_response}")
 
             return True
 
@@ -303,13 +237,12 @@ class MultinestModeling:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--uuid", type=str, required=True)
     parser.add_argument("--debug", action='store_true', help="Run in debug mode")
     args = parser.parse_args()
 
     try:
-        modeling = MultinestModeling(args.uuid)
-        result = modeling.debug_run() if args.debug else modeling.run()
+        modeling = MultinestModeling(uuid="some_id")
+        result = modeling.run()
         exit_code = 0 if result else 1
     except Exception as e:
         logging.error(f"Unhandled error: {e}")

@@ -39,7 +39,8 @@ WORKDIR MultiNest/MultiNest_v3.12_CMake/multinest
 
 COPY multinest_modeling.py .
 COPY ./files ./files
+COPY ./data.csv ./data.csv
 
 # Set the entrypoint command to run the Python script
 
-CMD ["python3", "multinest_modeling.py"]
+CMD ["python3", "multinest_modeling2.py"]
