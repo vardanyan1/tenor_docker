@@ -43,4 +43,4 @@ COPY ./data.csv ./data.csv
 
 # Set the entrypoint command to run the Python script
 
-CMD ["python3", "multinest_modeling2.py"]
+CMD ["python3", "multinest_modeling.py"]

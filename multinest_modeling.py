@@ -38,8 +38,8 @@ class DataHandler:
 
     def read_data(self):
         # Hardcoded values for ebl_value and z_value for testing
-        ebl_value = 1.0  # Example EBL value, adjust as needed
-        z_value = 0.5  # Example redshift value, adjust as needed
+        ebl_value = True  # Example EBL value, adjust as needed
+        z_value = 0.038  # Example redshift value, adjust as needed
 
         # Process the CSV file
         try:
